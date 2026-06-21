@@ -1,0 +1,128 @@
+
+export type UserRole = 'PATIENT' | 'DOCTOR' | 'ADMIN';
+
+export interface TimeSlot {
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+}
+
+export interface BlockedSlot {
+  id: string;
+  date: string; // YYYY-MM-DD
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  reason: string;
+  isAllDay: boolean;
+}
+
+export interface DaySchedule {
+  dayIndex: number; // 0 = Sunday, 1 = Monday, etc.
+  slots: TimeSlot[];
+  isActive: boolean;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  username?: string;
+  role: UserRole;
+  avatar?: string;
+  specialization?: string;
+  contact?: string;
+  preferredLanguage?: string;
+  isAvailable?: boolean; // Live status toggle
+  isApproved?: boolean;
+  workingHours?: string; // Legacy field
+  daySchedules?: DaySchedule[];
+  blockedSlots?: BlockedSlot[];
+  gender?: string;
+  dob?: string;
+  bloodGroup?: string;
+  address?: string;
+  vitalBp?: string;
+  vitalWeight?: string;
+  vitalGlucose?: string;
+  vitalTemperature?: string;
+}
+
+export interface Appointment {
+  id: string;
+  patientId: string;
+  patientName: string;
+  doctorId: string;
+  doctorName: string;
+  date: string;
+  time: string;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  type: 'VIRTUAL' | 'IN-PERSON';
+  doctorContact?: string;
+  doctor?: {
+    id?: string;
+    name?: string;
+    contact?: string;
+    specialization?: string;
+  };
+  patient?: {
+    id?: string;
+    name?: string;
+  };
+}
+
+export interface MedicalReport {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  doctorId: string | null;
+  doctorName: string;
+  date: string;
+  summary: string;
+  diagnosis: string;
+  prescription: string[];
+  medications?: string[];
+  confidenceScore?: number;
+  aiConfidence?: number;
+  inputLanguage?: string;
+  symptoms?: string[];
+  history?: Record<string, string>;
+  reportType?: 'AI' | 'CONSULTATION' | 'UPLOADED';
+  fileUrl?: string;
+  fileName?: string;
+  vitals?: {
+    bp?: string;
+    weight?: string;
+    temperature?: string;
+  };
+}
+
+export interface Message {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp: Date;
+  recommendedDoctors?: { id: string, name: string, specialization?: string }[];
+  suggestions?: { id: string, label: string }[];
+  chatState?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'REMINDER' | 'SUCCESS' | 'ALERT' | 'CALL' | 'CALL_NUDGE';
+  timestamp: Date;
+  isRead: boolean;
+  appointmentId?: string;
+  metadata?: any;
+}
+
+export type MedicationUnit = 'TABLET' | 'CAPSULE' | 'ML' | 'MG' | 'DROPS' | 'INJECTION';
+
+export interface Prescription {
+  name: string;
+  dosage: string;
+  unit: MedicationUnit;
+  times: string[];
+  days: number;
+}

@@ -1,0 +1,16 @@
+flask
+flask-cors
+numpy
+scikit-learn
+deep-translator
+langdetect
+pandas
+gunicorn
+# Text extraction for uploaded medical reports
+pdfplumber
+PyPDF2
+pytesseract
+Pillow
+PyMuPDF
+SpeechRecognition
+pydub
