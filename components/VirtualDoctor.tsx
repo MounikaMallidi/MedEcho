@@ -20,7 +20,7 @@ interface VirtualDoctorProps {
 
 type Persona = 'Sarah' | 'James' | 'Elena' | 'Marcus';
 const INDIAN_LANGUAGES = [
-  "english", "hindi", "telugu", "tamil", "bengali", "marathi", "gujarati", "kannada", "malayalam", "punjabi"
+  "English", "Hindi", "Telugu", "Tamil", "Bengali", "Marathi", "Gujarati", "Kannada", "Malayalam", "Punjabi"
 ];
 
 const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessionComplete }) => {
@@ -46,6 +46,97 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
   const didStreamIdRef = useRef<string | null>(null);
   const didVideoRef = useRef<HTMLVideoElement>(null);
   const [streamConnected, setStreamConnected] = useState(false);
+  const [fallbackAudio, setFallbackAudio] = useState(false);
+  const fallbackAudioRef = useRef(false);
+  const isActiveRef = useRef(false);
+
+  useEffect(() => {
+    fallbackAudioRef.current = fallbackAudio;
+  }, [fallbackAudio]);
+
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const sessionPromiseRef = useRef<Promise<any> | null>(null);
+  const transcriptionRef = useRef<string>("");
+
+  const cleanupAudio = async () => {
+    isActiveRef.current = false;
+    if (scriptProcessorRef.current) {
+      try {
+        scriptProcessorRef.current.onaudioprocess = null;
+        scriptProcessorRef.current.disconnect();
+      } catch (e) {
+        console.error("Error disconnecting scriptProcessor:", e);
+      }
+      scriptProcessorRef.current = null;
+    }
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.disconnect();
+      } catch (e) {
+        console.error("Error disconnecting audioSource:", e);
+      }
+      audioSourceRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        if (audioContextRef.current.state !== 'closed') {
+          await audioContextRef.current.close();
+        }
+      } catch (e) {
+        console.error("Error closing audioContext:", e);
+      }
+      audioContextRef.current = null;
+    }
+    if (outputAudioContextRef.current) {
+      try {
+        if (outputAudioContextRef.current.state !== 'closed') {
+          await outputAudioContextRef.current.close();
+        }
+      } catch (e) {
+        console.error("Error closing outputAudioContext:", e);
+      }
+      outputAudioContextRef.current = null;
+    }
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        console.error("Error stopping stream tracks:", e);
+      }
+      streamRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      isActiveRef.current = false;
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      cleanupAudio();
+      if (sessionPromiseRef.current) {
+        sessionPromiseRef.current.then(s => {
+          try {
+            s.close();
+          } catch (e) {
+            console.error("Error closing Gemini session:", e);
+          }
+        });
+      }
+      if (speakingTimeoutRef.current) {
+        clearTimeout(speakingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Map language codes to Virtual Doctor's display names
   const langMap: Record<string, string> = {
@@ -61,11 +152,6 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
   };
   const defaultLang = langMap[user.preferredLanguage || 'en'] || 'English';
   const [language, setLanguage] = useState(defaultLang);
-
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  const transcriptionRef = useRef<string>("");
 
   const personas = {
     Sarah: { img: "https://clips-presenters.d-id.com/amy/image.png", voice: "Puck", desc: "Empathetic", gender: "female" },
@@ -101,10 +187,13 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
   const startSession = async () => {
     try {
       setIsConnecting(true);
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || '';
+      console.log("Initializing GoogleGenAI with API Key (partial):", apiKey ? `${apiKey.slice(0, 8)}...${apiKey.slice(-6)}` : "empty");
+      const ai = new GoogleGenAI({ apiKey });
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = inputCtx;
+      outputAudioContextRef.current = outputCtx;
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -120,8 +209,12 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
         callbacks: {
           onopen: () => {
             const source = inputCtx.createMediaStreamSource(stream);
+            audioSourceRef.current = source;
             const scriptProcessor = inputCtx.createScriptProcessor(4096, 1, 1);
+            scriptProcessorRef.current = scriptProcessor;
+
             scriptProcessor.onaudioprocess = (e) => {
+              if (!isActiveRef.current) return;
               const inputData = e.inputBuffer.getChannelData(0);
               const avg = inputData.reduce((acc, val) => acc + Math.abs(val), 0) / inputData.length;
               setVisualizerData(prev => [...prev.slice(1), 5 + avg * 400]);
@@ -139,7 +232,13 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
               for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
 
               const pcmBlob = { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
-              sessionPromise.then(s => s.sendRealtimeInput({ media: pcmBlob }));
+              sessionPromise.then(s => {
+                if (isActiveRef.current) {
+                  s.sendRealtimeInput({ media: pcmBlob });
+                }
+              }).catch(err => {
+                console.warn("Failed to send realtime input:", err);
+              });
             };
             source.connect(scriptProcessor);
             scriptProcessor.connect(inputCtx.destination);
@@ -182,10 +281,9 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
               }
             }
 
-            // Inline audio playback disabled in favor of D-ID video
-            /*
+            // Inline audio playback enabled in case D-ID fails (credits empty)
             const audioBase64 = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-            if (audioBase64) {
+            if (audioBase64 && fallbackAudioRef.current) {
               nextStartTime = Math.max(nextStartTime, outputCtx.currentTime);
               const buffer = await decodeAudioData(decode(audioBase64), outputCtx, 24000, 1);
               const source = outputCtx.createBufferSource();
@@ -196,10 +294,18 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
               sources.add(source);
               source.onended = () => sources.delete(source);
             }
-            */
           },
-          onerror: () => { setIsActive(false); setIsConnecting(false); },
-          onclose: () => setIsActive(false),
+          onerror: (err: any) => {
+            console.error("Gemini Live Session WebSocket Error:", err);
+            setIsActive(false);
+            setIsConnecting(false);
+            cleanupAudio();
+          },
+          onclose: (event: any) => {
+            console.log("Gemini Live Session Closed. Code:", event?.code, "Reason:", event?.reason);
+            setIsActive(false);
+            cleanupAudio();
+          },
         },
         config: {
           // Fixed typo: responseModalities
@@ -211,6 +317,17 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
 
         }
       });
+
+      sessionPromise.then(() => {
+        console.log("Gemini Live Session established successfully.");
+      }).catch(err => {
+        console.error("Gemini Live Session Promise Rejected:", err);
+        setIsActive(false);
+        setIsConnecting(false);
+        cleanupAudio();
+        alert("Gemini Connection Failed: " + (err.message || "403 Forbidden. The Gemini API key you are using has restrictions or is experiencing disruptions. Go to console.cloud.google.com/apis/credentials to restrict it or generate a new restricted key."));
+      });
+
       sessionPromiseRef.current = sessionPromise;
     } catch (err: any) {
       console.error("Start Session Error:", err);
@@ -297,9 +414,9 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
       }
 
     } catch (err: any) {
-      console.error("D-ID Stream Initialization Error:", err);
+      console.error("D-ID Stream Initialization Error, falling back to Voice-Only mode:", err);
+      setFallbackAudio(true);
       setIsGenerating(false);
-      alert("Avatar Generation Error: " + (err?.response?.data?.message || err?.message || 'Unknown error. Check console.'));
     }
   };
 
@@ -314,7 +431,8 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
         gender: personas[persona].gender
       });
     } catch (err) {
-      console.error("D-ID Stream Send Error:", err);
+      console.error("D-ID Stream Send Error, falling back to Voice-Only mode:", err);
+      setFallbackAudio(true);
     }
   };
 
@@ -332,14 +450,25 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
         console.error("D-ID cleanup error", err);
       }
     }
+    didStreamIdRef.current = null;
+    didSessionIdRef.current = null;
     setStreamConnected(false);
+    setFallbackAudio(false);
     if (didVideoRef.current) didVideoRef.current.srcObject = null;
   };
 
   const endSession = async () => {
     setIsAnalyzing(true);
-    if (sessionPromiseRef.current) (await sessionPromiseRef.current).close();
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    isActiveRef.current = false;
+    if (sessionPromiseRef.current) {
+      try {
+        const s = await sessionPromiseRef.current;
+        s.close();
+      } catch (e) {
+        console.error("Error closing session:", e);
+      }
+    }
+    await cleanupAudio();
     setIsActive(false);
     await closeDIDStream();
 
@@ -404,7 +533,7 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20'
                       : 'bg-white/50 text-slate-500 border border-slate-100 hover:bg-white hover:text-blue-600 hover:border-blue-100'}`}
                   >
-                    <TranslatedText text={lang} lang={user.preferredLanguage} />
+                    <TranslatedText text={lang.toLowerCase()} lang={user.preferredLanguage} />
                   </button>
                 ))}
               </div>
@@ -459,6 +588,11 @@ const VirtualDoctor: React.FC<VirtualDoctorProps> = ({ patientId, user, onSessio
           <div className="bg-black/30 backdrop-blur-xl px-4 py-2 rounded-full border border-white/20 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
             <TranslatedText text={language} lang={user.preferredLanguage} /> <TranslatedText text={t.languageMode} lang={user.preferredLanguage} />
           </div>
+          {fallbackAudio && (
+            <div className="bg-indigo-600/80 backdrop-blur-xl px-4 py-2 rounded-full border border-indigo-400/30 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">
+              Voice-Only Mode (Avatar Offline)
+            </div>
+          )}
         </div>
 
         {/* Top Right HUD - Listening Indicator */}
