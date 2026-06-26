@@ -7,7 +7,7 @@ MedEcho is an advanced, AI-driven healthcare ecosystem designed to bridge the ga
 ## 🏛️ Project Structure
 
 - **`/` (Root)**: Frontend React (Vite) application - The modern, responsive UI for patients and clinical staff.
-- **`/server`**: Backend Node.js/Express service - Managing users, authentication, dynamic scheduling, and PostgreSQL persistence via Prisma.
+- **`/server`**: Backend Node.js/Express service - Managing users, authentication, dynamic scheduling, and MongoDB persistence via Prisma.
 - **`/ml_service`**: AI/ML Microservice (Flask/Python) - Handling symptom extraction, negation detection, and disease prediction logic.
 
 ---
@@ -70,7 +70,7 @@ Requirement Analysis focuses heavily on translating human functional needs into 
 - **Frontend:** React.js 19.x (Vite), TailwindCSS.
 - **Backend:** Node.js (Express.js).
 - **ML Engine:** Python 3.10+ (Flask).
-- **Database:** PostgreSQL (Prisma ORM).
+- **Database:** MongoDB (Prisma ORM).
 - **Development Workbench:** Visual Studio Code.
 - **Testing:** Postman & Browser Developer Consoles.
 
@@ -339,8 +339,8 @@ Rigid metric-based validation ensures data boundaries and logical workflows oper
 
 1.  **Project Root Directory Structure (VS Code)**: This screen shows the overall project organization in the Visual Studio Code editor. It highlights the separation of concerns between the `/ml_service` (Python/Flask), `/server` (Node.js/Prisma), and the root React application.
 2.  **Machine Learning Service Initialization (Flask)**: A terminal view showing the ML service booting up on `http://localhost:8000`. It displays logs for loading the `disease_model.pkl` (Decision Tree) and initializing CORS policies.
-3.  **Backend Server Connectivity (Node.js & Prisma)**: Logs from the Node.js server indicating a successful connection to the PostgreSQL database via Prisma ORM. It also shows the server listening on port 5000.
-4.  **PostgreSQL Database Schema (Prisma Model)**: A code snapshot of the `schema.prisma` file, defining the relationships between Users, Appointments, Clinical Reports, and Blocked Slots.
+3.  **Backend Server Connectivity (Node.js & Prisma)**: Logs from the Node.js server indicating a successful connection to the MongoDB database via Prisma ORM. It also shows the server listening on port 5000.
+4.  **MongoDB Database Schema (Prisma Model)**: A code snapshot of the `schema.prisma` file, defining the relationships between Users, Appointments, Clinical Reports, and Blocked Slots.
 5.  **MedEcho Central Landing Interface**: The primary entry point of the web application. It features a modern, clean UI with cards for "Virtual Doctor Chat" and the "Health Management Portal."
 6.  **Role-Based Authentication Portal**: The login screen featuring a toggle switch to differentiate between **Doctor** and **Patient** logins. It includes secure email/password validation.
 7.  **Successful Authentication (Toast Notifications)**: Captures the moment a user logs in successfully, showing a non-intrusive green "Toast" notification in the corner of the browser.
@@ -397,7 +397,7 @@ The "Talk" and "Diagnose" engine of the system.
 ### 2. Backend Server (`/server`)
 The orchestrator managing the "Heal" and administrative workflow.
 - **Runtime**: `Node.js` with `Express.js`.
-- **Database (ORM)**: `Prisma` mapping to a **PostgreSQL** relational database.
+- **Database (ORM)**: `Prisma` mapping to a **MongoDB** relational database.
 - **Real-time Interaction**: `Socket.io` for instant appointment notifications and updates.
 - **Security**: `JWT` (JSON Web Tokens) for role-based access; `Bcryptjs` for secure password hashing.
 - **Utility Layers**: 
@@ -466,18 +466,4 @@ npm run dev
 
 ---
 
-## 🔐 Demo Credentials
-| Role | Email | Password |
-|------|-------|----------|
-| **Doctor** | `sarah@medecho.com` | `123456` |
-| **Patient** | `patient@medecho.com` | `123456` |
 
----
-
-## 👨‍💻 Development Team – C15
-- **Sabbella Laharika** (22A91A05J9)
-- **Lokanadham Jyoshnavi** (22A91A05I9)
-- **Dipendra Prasad Gupta** (22A91A05H4)
-- **Vegi Sravan Kumar** (22A91A05K6)
-
-*Under the Supervision of **Dr. Tirukoti Sudha Rani**, Assistant Professor & HOD, CSE, Aditya University.*
