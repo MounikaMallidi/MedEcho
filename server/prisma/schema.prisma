@@ -1,12 +1,9 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -30,9 +27,9 @@ enum AppointmentType {
 }
 
 model User {
-  id                String    @id @default(uuid())
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
   email             String    @unique
-  username          String?   @unique
+  username          String?  
   passwordHash      String
   name              String
   role              Role      @default(PATIENT)
@@ -70,17 +67,17 @@ model User {
 }
 
 model Appointment {
-  id          String            @id @default(uuid())
-  doctorId    String
-  patientId   String
-  date        DateTime
-  time        String?           // "09:00" format
-  status      AppointmentStatus @default(PENDING)
-  type        AppointmentType   @default(VIRTUAL)
-  meetingLink String?           // For virtual meetings
-  timezoneOffset Int           @default(-330) // Default to IST offset (-330 mins) if not provided
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id             String            @id @default(auto()) @map("_id") @db.ObjectId
+  doctorId       String            @db.ObjectId
+  patientId      String            @db.ObjectId
+  date           DateTime
+  time           String?           // "09:00" format
+  status         AppointmentStatus @default(PENDING)
+  type           AppointmentType   @default(VIRTUAL)
+  meetingLink    String?           // For virtual meetings
+  timezoneOffset Int               @default(-330) // Default to IST offset (-330 mins) if not provided
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   // Relations
   doctor  User @relation("DoctorAppointments", fields: [doctorId], references: [id])
@@ -92,8 +89,8 @@ model Appointment {
 }
 
 model Report {
-  id              String   @id @default(uuid())
-  patientId       String
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  patientId       String   @db.ObjectId
   diagnosis       String
   confidenceScore Float?
   precautions     Json     // Stored as JSON array or object
@@ -109,17 +106,17 @@ model Report {
   createdAt       DateTime @default(now())
 
   // Relations
-  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   User       @relation(fields: [patientId], references: [id], onDelete: Cascade)
   reminders Reminder[]
 
   @@index([patientId])
-  doctor  User? @relation("DoctorReports", fields: [doctorId], references: [id]) 
-  doctorId String?
+  doctor    User?      @relation("DoctorReports", fields: [doctorId], references: [id]) 
+  doctorId  String?    @db.ObjectId
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   title     String
   message   String
   type      String?  @default("INFO")
@@ -132,8 +129,8 @@ model Notification {
 }
 
 model DoctorSchedule {
-  id        String  @id @default(uuid())
-  doctorId  String
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  doctorId  String  @db.ObjectId
   dayIndex  Int     // 0=Sun, 1=Mon, ..., 6=Sat
   startTime String  // "09:00"
   endTime   String  // "18:00"
@@ -143,8 +140,8 @@ model DoctorSchedule {
 }
 
 model BlockedSlot {
-  id        String @id @default(uuid())
-  doctorId  String
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  doctorId  String @db.ObjectId
   date      String // "2026-03-17"
   startTime String // "10:00"
   endTime   String // "12:00"
@@ -163,9 +160,9 @@ enum MedicationUnit {
 }
 
 model Reminder {
-  id             String         @id @default(uuid())
-  userId         String
-  reportId       String?
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String         @db.ObjectId
+  reportId       String?        @db.ObjectId
   medicationName String
   dosage         String?
   unit           MedicationUnit @default(TABLET)
@@ -183,8 +180,8 @@ model Reminder {
 }
 
 model PushSubscription {
-  id        String   @id @default(uuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   endpoint  String   @unique
   p256dh    String
   auth      String
